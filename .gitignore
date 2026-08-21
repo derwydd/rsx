@@ -1,0 +1,8 @@
+*.gem
+.bundle/
+.rsx-cache/
+Gemfile.lock
+coverage/
+doc/
+pkg/
+tmp/
