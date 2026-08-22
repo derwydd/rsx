@@ -17,6 +17,8 @@ end
 export default Greeting
 ```
 
+[Example: RSX with Tailwind CSS](https://github.com/derwydd/rsx-working-example)
+
 Templates are compiled ahead of time into plain Ruby string building, so rendering is
 concatenation and escaping — no interpreter, no virtual DOM, no diffing. RSX has **zero runtime
 dependencies**; the Rails integration activates itself only when Rails is already loaded.
