@@ -3,6 +3,7 @@
 $LOAD_PATH.unshift File.expand_path("../lib", __dir__)
 
 require "minitest/autorun"
+require "uri" # ActionView 7.1 looks up URI without requiring it
 require "rsx"
 
 module RSXTest
