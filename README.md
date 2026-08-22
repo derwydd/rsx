@@ -19,6 +19,20 @@ export default Greeting
 
 [Example: RSX with Tailwind CSS](https://github.com/derwydd/rsx-working-example)
 
+Install it from RubyGems as **`rsx-rb`** (`rsx` is already taken):
+
+```ruby
+# Gemfile
+gem "rsx-rb"
+```
+
+```bash
+bundle install
+# or: gem install rsx-rb
+```
+
+Then `require "rsx"`. Bundler does that for you.
+
 Templates are compiled ahead of time into plain Ruby string building, so rendering is
 concatenation and escaping — no interpreter, no virtual DOM, no diffing. RSX has **zero runtime
 dependencies**; the Rails integration activates itself only when Rails is already loaded.
@@ -154,7 +168,7 @@ The full version lives in [`examples/user_profile.rsx`](examples/user_profile.rs
 Add the gem to your Gemfile:
 
 ```ruby
-gem "rsx"
+gem "rsx-rb"
 ```
 
 Then:
@@ -166,8 +180,10 @@ bundle install
 Or install it directly:
 
 ```bash
-gem install rsx
+gem install rsx-rb
 ```
+
+The published gem is `rsx-rb` because `rsx` is already taken on RubyGems. The library is still `require "rsx"` — Bundler does that automatically.
 
 RSX requires **Ruby 3.0+**. It has no runtime dependencies. In a Rails app — ActionView is the
 only part RSX touches, and the suite runs against 7.1 — the railtie loads automatically and:

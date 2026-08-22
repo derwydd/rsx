@@ -5,6 +5,8 @@ All notable changes to RSX are documented here. This project follows
 
 ## [Unreleased]
 
+- Publish the gem as `rsx-rb` on RubyGems. The require path remains `rsx`.
+
 ## [0.1.0]
 
 First release.

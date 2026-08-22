@@ -3,7 +3,7 @@
 require_relative "lib/rsx/version"
 
 Gem::Specification.new do |spec|
-  spec.name = "rsx"
+  spec.name = "rsx-rb"
   spec.version = RSX::VERSION
   spec.authors = ["RSX contributors"]
 
