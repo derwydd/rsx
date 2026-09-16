@@ -7,7 +7,8 @@ module RSX
   class Loader
     EXTENSIONS = [".rsx", ".html.rsx"].freeze
 
-    Entry = Struct.new(:path, :digest, :mtime, :components, :default, :template, keyword_init: true) do
+    Entry = Struct.new(:path, :digest, :mtime, :components, :default, :template, :statics_prefix,
+                       keyword_init: true) do
       # Markup files render through a template; component files render their
       # default export.
       def renderable
@@ -52,7 +53,8 @@ module RSX
 
         unload(existing) if existing
 
-        entry = Entry.new(path: absolute, digest: digest, mtime: mtime(absolute), components: [], default: nil)
+        entry = Entry.new(path: absolute, digest: digest, mtime: mtime(absolute), components: [],
+                          default: nil, statics_prefix: Transformer.static_prefix(source))
         @entries[absolute] = entry
         @stack.push(entry)
 
@@ -128,21 +130,18 @@ module RSX
       end
 
       candidates.each do |candidate|
-        return candidate if File.file?(candidate)
-
-        EXTENSIONS.each do |extension|
-          with_extension = "#{candidate}#{extension}"
-          return with_extension if File.file?(with_extension)
-        end
+        found = rsx_file_at(candidate)
+        return found if found && within_roots?(found)
       end
 
       nil
     end
 
     def resolve!(spec, from: nil)
-      resolve(spec, from: from) ||
-        raise(FileNotFoundError, "could not find `#{spec}`#{" imported from #{from}" if from}. " \
-                                 "Looked in: #{Array(@config.paths).join(", ")}")
+      resolved = resolve(spec, from: from)
+      return resolved if resolved
+
+      raise FileNotFoundError, unresolvable(spec, from)
     end
 
     def import(spec, as: nil, from: nil)
@@ -170,6 +169,40 @@ module RSX
 
     private
 
+    def rsx_file_at(candidate)
+      return candidate if candidate.end_with?(".rsx") && File.file?(candidate)
+
+      EXTENSIONS.each do |extension|
+        with_extension = "#{candidate}#{extension}"
+        return with_extension if File.file?(with_extension)
+      end
+
+      nil
+    end
+
+    # Loading a template evaluates it, so resolution stays inside the configured
+    # paths (plus the working directory, which is what scripts and the CLI point
+    # at). Without this a spec that came from a request could name any file on
+    # disk. Paths are compared after expansion, so `../` cannot climb out.
+    def within_roots?(path)
+      target = File.expand_path(path)
+      roots.any? { |root| target == root || target.start_with?("#{root}#{File::SEPARATOR}") }
+    end
+
+    def roots
+      Array(@config.paths).map { |root| File.expand_path(root.to_s) }.push(File.expand_path(Dir.pwd)).uniq
+    end
+
+    def unresolvable(spec, from)
+      searched = Array(@config.paths).join(", ")
+      if rsx_file_at(File.expand_path(spec.to_s, Dir.pwd)) || rsx_file_at(spec.to_s)
+        "`#{spec}` is outside the configured RSX paths, so it will not be loaded. " \
+          "Add its directory to RSX.config.paths. Configured: #{searched}"
+      else
+        "could not find `#{spec}`#{" imported from #{from}" if from}. Looked in: #{searched}"
+      end
+    end
+
     def mtime(path)
       File.mtime(path)
     rescue SystemCallError
@@ -189,6 +222,7 @@ module RSX
       entry.components.each { |component| RSX.remove_constant(component) }
       entry.components.clear
       entry.default = nil
+      RSX.discard_statics(entry.statics_prefix)
     end
   end
 end

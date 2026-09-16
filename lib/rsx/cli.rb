@@ -75,6 +75,9 @@ module RSX
 
     def render(files, props)
       abort_missing(files)
+      # Naming a file on the command line is as explicit as it gets, so add its
+      # directory to the load path rather than have the loader refuse it.
+      RSX.config.paths |= files.map { |file| File.dirname(File.expand_path(file)) }
       files.each { |file| puts RSX.render_file(File.expand_path(file), **props) }
     end
 

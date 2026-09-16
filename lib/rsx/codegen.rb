@@ -264,10 +264,14 @@ module RSX
       buffer = +""
 
       # Markup with nothing dynamic in it is built once and then reused from a
-      # per-call-site slot, so re-rendering it allocates nothing at all. The
-      # literal after `||=` is never evaluated again after the first render.
-      buffer << "(::RSX::STATICS[#{static_slot}] ||= " if static
-      buffer << (static ? "::RSX.static(" : "::RSX::SafeString.new(")
+      # per-call-site slot, so re-rendering it allocates nothing at all. Once the
+      # slot is filled the read short-circuits and the literal is never built.
+      if static
+        slot = static_slot
+        buffer << "(::RSX::STATICS[#{slot}] || ::RSX.define_static(#{slot}, "
+      else
+        buffer << "::RSX::SafeString.new("
+      end
       state = { line: start_line, open: false }
 
       parts.each do |kind, text, line|

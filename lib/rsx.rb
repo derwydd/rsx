@@ -31,7 +31,11 @@ module RSX
 
   # Slots for markup that never changes, populated on first render by compiled
   # templates. Keys are generated at compile time, one per call site.
+  #
+  # Compiled markup reads a slot directly and only calls define_static on a miss,
+  # so the render path is a bare Hash read and the lock is paid once per slot.
   STATICS = {}
+  STATICS_LOCK = Mutex.new
 
   # Configuration is intentionally small: where to find components, where to put
   # compiled output, and which cache to use.
@@ -188,10 +192,9 @@ module RSX
 
     # Internal: emitted by compiled markup for every <Component /> tag.
     def render_component(target, props = nil, children = nil, parent = nil)
-      if children
-        props = props ? props : {}
-        props[:children] = children
-      end
+      # Copied rather than written into, so that a caller holding the hash does
+      # not find :children added to it.
+      props = props ? props.merge(children: children) : { children: children } if children
 
       case target
       when Proc
@@ -254,9 +257,19 @@ module RSX
       end
     end
 
-    # Wraps markup that the compiler proved static. Called once per call site.
-    def static(literal)
-      SafeString.new(literal).freeze
+    # Internal: fills a static slot the first time its call site renders.
+    def define_static(key, literal)
+      STATICS_LOCK.synchronize { STATICS[key] ||= SafeString.new(literal).freeze }
+    end
+
+    # Internal: drops the slots belonging to one compiled version of a file.
+    # Editing a file in development compiles it under a fresh set of keys, and the
+    # old ones can never be reached again, so they would accumulate for the life
+    # of the process.
+    def discard_statics(prefix)
+      return if prefix.nil?
+
+      STATICS_LOCK.synchronize { STATICS.delete_if { |key, _| key.to_s.start_with?(prefix) } }
     end
 
     # Wraps an already-escaped or trusted string without copying when possible.

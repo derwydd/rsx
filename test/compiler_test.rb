@@ -10,7 +10,14 @@ class CompilerTest < Minitest::Test
     ruby = compile(%(<div className="card"><h1>Title</h1><p>Body</p></div>))
 
     assert_includes ruby, %(<div class=\\"card\\"><h1>Title</h1><p>Body</p></div>)
-    assert_equal 1, ruby.scan("::RSX.static").length
+    assert_equal 1, ruby.scan("::RSX.define_static").length
+  end
+
+  # Filling a slot happens once; every later render is the Hash read alone.
+  def test_a_static_slot_is_read_before_it_is_filled
+    ruby = compile(%(<p>Body</p>))
+
+    assert_match(/::RSX::STATICS\[(:"[^"]+")\] \|\| ::RSX\.define_static\(\1, /, ruby)
   end
 
   def test_dynamic_markup_keeps_static_text_inline
@@ -18,7 +25,7 @@ class CompilerTest < Minitest::Test
 
     assert_includes ruby, %(<div><h1>Title</h1><p>)
     assert_includes ruby, "::RSX.child((name))"
-    refute_includes ruby, "::RSX.static"
+    refute_includes ruby, "::RSX.define_static"
   end
 
   def test_generated_ruby_has_the_same_number_of_lines

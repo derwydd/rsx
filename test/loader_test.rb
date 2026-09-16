@@ -136,6 +136,61 @@ class LoaderTest < Minitest::Test
     end
   end
 
+  # Every edit compiles the file under a fresh set of static slots, so the ones
+  # belonging to the version being replaced have to go with it.
+  def test_reloading_discards_the_previous_versions_static_slots
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, "alpha.rsx")
+      RSX.config.paths = [dir]
+
+      3.times do |version|
+        File.write(path, "component Alpha do |props|\n  return <p>v#{version}</p>\nend\n")
+        File.utime(Time.now + version, Time.now + version, path)
+        RSX.reload!
+        RSX.load(path)
+        Alpha.call.to_s
+      end
+
+      assert_equal 1, RSX::STATICS.length
+    end
+  end
+
+  # Loading a template evaluates it, so a spec that came from a request must not
+  # be able to name a file outside the configured paths.
+  def test_resolution_stays_inside_the_configured_paths
+    assert_nil RSX.loader.resolve("../../../../etc/passwd")
+    assert_nil RSX.loader.resolve("/etc/passwd")
+  end
+
+  def test_a_file_outside_the_configured_paths_says_so
+    Dir.mktmpdir do |dir|
+      outside = File.join(dir, "outside.rsx")
+      File.write(outside, "<p>x</p>\n")
+
+      error = assert_raises(RSX::FileNotFoundError) { RSX.render_file(outside) }
+      assert_includes error.message, "outside the configured RSX paths"
+    end
+  end
+
+  def test_only_rsx_files_are_resolved
+    Dir.mktmpdir do |dir|
+      File.write(File.join(dir, "secrets.yml"), "password: hunter2\n")
+      RSX.config.paths = [dir]
+
+      assert_nil RSX.loader.resolve("secrets.yml")
+    end
+  end
+
+  def test_adding_the_directory_makes_it_resolvable
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, "inside.rsx")
+      File.write(path, "<p>x</p>\n")
+      RSX.config.paths = [dir]
+
+      assert_equal "<p>x</p>", RSX.render_file(path).to_s
+    end
+  end
+
   def test_syntax_errors_name_the_file_and_line
     Dir.mktmpdir do |dir|
       path = File.join(dir, "broken.rsx")

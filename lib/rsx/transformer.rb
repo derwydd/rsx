@@ -63,9 +63,15 @@ module RSX
       @jsx_spans = []
       @components = 0
       @preformatted = 0
-      # Static markup slots are keyed by a digest of the source, so recompiling
-      # the same file reuses the same slots instead of leaking new ones.
-      @codegen = Codegen.new(path: path, prefix: "#{Digest::SHA256.hexdigest(@src)[0, 10]}-")
+      @codegen = Codegen.new(path: path, prefix: self.class.static_prefix(@src))
+    end
+
+    # Static markup slots are keyed by a digest of the source, so recompiling the
+    # same file reuses its slots rather than adding another set. Deriving the
+    # prefix from the source alone also lets the loader find and drop the slots
+    # belonging to a version of a file it is replacing.
+    def self.static_prefix(source)
+      "#{Digest::SHA256.hexdigest(source.to_s)[0, 10]}-"
     end
 
     def transform

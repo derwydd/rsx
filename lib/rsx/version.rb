@@ -4,5 +4,5 @@ module RSX
   VERSION = "0.1.0"
 
   # Bumping this invalidates every on-disk compile cache entry.
-  COMPILER_VERSION = "1"
+  COMPILER_VERSION = "2"
 end
