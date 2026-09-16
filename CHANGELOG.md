@@ -5,7 +5,7 @@ All notable changes to RSX are documented here. This project follows
 
 ## [Unreleased]
 
-- Publish the gem as `rsx-rb` on RubyGems. The require path remains `rsx`.
+## [0.2.0] - 2026-09-16
 
 ### Fixed
 
@@ -54,7 +54,7 @@ All notable changes to RSX are documented here. This project follows
 
 ## [0.1.0]
 
-First release.
+First release, published as `rsx-rb` on RubyGems. The require path is `rsx`.
 
 - `.rsx` templates: JSX syntax with Ruby in place of JavaScript — `<>` fragments, `{}`
   expression containers, `{/* comments */}`, JSX whitespace rules, void and self-closing

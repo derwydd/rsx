@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module RSX
-  VERSION = "0.1.0"
+  VERSION = "0.2.0"
 
   # Bumping this invalidates every on-disk compile cache entry.
   COMPILER_VERSION = "2"
