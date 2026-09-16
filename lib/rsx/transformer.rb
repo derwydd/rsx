@@ -245,14 +245,10 @@ module RSX
     def copy_operator
       char = peek
 
-      # `::` and `?.`-like sequences are copied whole so state stays accurate.
-      if char == ":" && peek(1) == ":"
-        copy(2)
-        @prev = :start
-      elsif char == "<" && peek(1) == "<"
-        # Reached only when this is not a heredoc, so it is an append: copy both
-        # characters at once, or the second one lands in expression position and
-        # `list <<x` reads as a tag.
+      # `::`, and a `<<` that heredoc_ahead? already ruled out as a heredoc, are
+      # copied whole so state stays accurate. Leaving the second character behind
+      # would put it in expression position, where `list <<x` reads as a tag.
+      if (char == ":" && peek(1) == ":") || (char == "<" && peek(1) == "<")
         copy(2)
         @prev = :start
       elsif char == ":" && symbol_ahead?
@@ -269,10 +265,10 @@ module RSX
 
     def copy_number
       copy while !eof? && /[0-9a-zA-Z_]/.match?(peek)
-      if peek == "." && peek(1) && DIGIT.match?(peek(1))
-        copy
-        copy while !eof? && /[0-9a-zA-Z_]/.match?(peek)
-      end
+      return unless peek == "." && peek(1) && DIGIT.match?(peek(1))
+
+      copy
+      copy while !eof? && /[0-9a-zA-Z_]/.match?(peek)
     end
 
     def copy_line_comment
@@ -377,8 +373,10 @@ module RSX
         char = peek
         case char
         when "\\" then copy(2)
-        when "[" then in_class = true; copy
-        when "]" then in_class = false; copy
+        when "[" then in_class = true
+                      copy
+        when "]" then in_class = false
+                      copy
         when "#"
           if peek(1) == "{"
             copy(2)
@@ -424,7 +422,9 @@ module RSX
         return
       end
       copy while !eof? && (IDENT_CHAR.match?(peek) || peek == "@" || peek == "$")
-      copy if peek == "?" || peek == "!" || (peek == "=" && peek(1) != "=" && peek(1) != ">" && peek(1) != "~")
+      if peek == "?" || peek == "!" || (peek == "=" && peek(1) != "=" && peek(1) != ">" && peek(1) != "~")
+        copy
+      end
     end
 
     # ------------------------------------------------------------------
@@ -456,7 +456,7 @@ module RSX
       indented = peek == "~" || peek == "-"
       copy if indented
 
-      quote = (peek == '"' || peek == "'" || peek == "`") ? peek : nil
+      quote = peek == '"' || peek == "'" || peek == "`" ? peek : nil
       copy if quote
       identifier = +""
       while !eof? && IDENT_CHAR.match?(peek)
@@ -547,11 +547,13 @@ module RSX
         if BLOCK_KEYWORDS.key?(word)
           @blocks.push({ kind: :block, line: @line })
           @prev = :start
+        # Stated ahead of OPENS_EXPRESSION so the precedence between the two
+        # tables is visible, even though the fallthrough agrees with it.
         elsif CLOSES_EXPRESSION.key?(word)
           @prev = :value
         elsif OPENS_EXPRESSION.key?(word)
           @prev = :start
-        else
+        else # rubocop:disable Lint/DuplicateBranch
           @prev = :value
         end
       end
@@ -595,10 +597,12 @@ module RSX
       leftover.empty?
     end
 
+    METHOD_NAME_CHAR = %r{[A-Za-z0-9_.?!\[\]<>=+\-*/%&|^~]}
+
     def endless_def_ahead?
       offset = 0
       offset += 1 while @pos + offset < @len && /[ \t]/.match?(@src[@pos + offset])
-      offset += 1 while @pos + offset < @len && /[A-Za-z0-9_.?!\[\]<>=+\-*\/%&|^~]/.match?(@src[@pos + offset])
+      offset += 1 while @pos + offset < @len && METHOD_NAME_CHAR.match?(@src[@pos + offset])
 
       if @src[@pos + offset] == "("
         depth = 0
@@ -633,7 +637,7 @@ module RSX
         lowercase = /\Acomponent[ \t]+([a-z_][A-Za-z0-9_]*)/.match(@src[@pos..])
         if lowercase
           error("component names must be constants, got `#{lowercase[1]}` " \
-                "(try `component #{lowercase[1].split('_').map(&:capitalize).join}`)")
+                "(try `component #{lowercase[1].split("_").map(&:capitalize).join}`)")
         end
         return false
       end
@@ -668,17 +672,21 @@ module RSX
       until eof?
         char = peek
         case char
-        when "(", "[", "{" then depth += 1; advance
-        when ")", "]", "}" then depth -= 1; advance
+        when "(", "[", "{" then depth += 1
+                                advance
+        when ")", "]", "}" then depth -= 1
+                                advance
         when "'", '"'
           capture { copy_quoted(char) }
         when "#"
           advance until eof? || peek == "\n"
         when "d"
-          if depth.zero? && lookahead(2) == "do" && !identifier_char?(peek(2)) && !identifier_char?(@src[@pos - 1])
+          if depth.zero? && lookahead(2) == "do" &&
+             !identifier_char?(peek(2)) && !identifier_char?(@src[@pos - 1])
             options = @src[start...@pos].strip
             advance(2)
             return "" if options.empty?
+
             return options.start_with?(",") ? options : ", #{options}"
           end
           advance
@@ -706,8 +714,10 @@ module RSX
       until eof?
         char = peek
         case char
-        when "(", "[", "{" then depth += 1; advance
-        when ")", "]", "}" then depth -= 1; advance
+        when "(", "[", "{" then depth += 1
+                                advance
+        when ")", "]", "}" then depth -= 1
+                                advance
         when "'", '"' then capture { copy_quoted(char) }
         when "|"
           if depth.zero?
@@ -879,7 +889,7 @@ module RSX
     def reject_void_closing_tag(tag, line)
       index = @src.index("<", @pos)
       return if index.nil?
-      return unless /\A<\/#{Regexp.escape(tag)}[ \t]*>/i.match?(@src[index..])
+      return unless %r{\A</#{Regexp.escape(tag)}[ \t]*>}i.match?(@src[index..])
 
       error("<#{tag}> is a void element: it takes no children and has no closing tag. " \
             "Write `<#{tag} />`.", line: line)
@@ -922,9 +932,7 @@ module RSX
           next
         end
 
-        unless ATTR_START.match?(peek)
-          error("unexpected `#{peek}` in <#{tag}> attributes")
-        end
+        error("unexpected `#{peek}` in <#{tag}> attributes") unless ATTR_START.match?(peek)
 
         name = read_attribute_name
         skip_tag_whitespace
@@ -1086,13 +1094,13 @@ module RSX
         return
       end
 
-      normalized = self.class.normalize_text(text)
+      normalized = normalize_text(text)
       children << Nodes::Text.new(normalized, line) unless normalized.empty?
     end
 
     # JSX whitespace rules: indentation-only lines disappear, and remaining lines
     # are joined with a single space.
-    def self.normalize_text(raw)
+    def normalize_text(raw)
       lines = raw.split("\n", -1)
       return lines.first.to_s if lines.length == 1
 
@@ -1117,7 +1125,7 @@ module RSX
       return if closing == tag
       return if tag == "" && closing == ""
 
-      error("closing tag `</#{closing}>` does not match opening tag `<#{tag.empty? ? '' : tag}>`")
+      error("closing tag `</#{closing}>` does not match opening tag `<#{tag unless tag.empty?}>`")
     end
   end
 end

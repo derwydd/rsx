@@ -158,7 +158,7 @@ class RubySyntaxTest < Minitest::Test
   end
 
   def test_string_interpolation_containing_markup
-    assert_equal "<p><i>x</i></p>", render(%q[<p>{RSX.raw("#{<i>x</i>}")}</p>])
+    assert_equal "<p><i>x</i></p>", render('<p>{RSX.raw("#{<i>x</i>}")}</p>')
   end
 
   def test_symbols_and_hashes

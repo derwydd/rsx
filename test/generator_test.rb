@@ -14,6 +14,8 @@ end
 
 # rails generate rsx:component
 class ComponentGeneratorTest < defined?(Rails::Generators::TestCase) ? Rails::Generators::TestCase : Minitest::Test
+  include RSXTest
+
   if RAILS_GENERATORS_AVAILABLE
     tests RSX::Generators::ComponentGenerator
     destination File.expand_path("../tmp/generator", __dir__)
@@ -21,16 +23,10 @@ class ComponentGeneratorTest < defined?(Rails::Generators::TestCase) ? Rails::Ge
   end
 
   def setup
-    skip "rails generators are not installed" unless RAILS_GENERATORS_AVAILABLE
+    require_rails!(RAILS_GENERATORS_AVAILABLE, "rails generators")
 
     super
-    RSX.reset!
     RSX.config.paths = []
-  end
-
-  def teardown
-    RSX.reset! if RAILS_GENERATORS_AVAILABLE
-    super
   end
 
   # `rails g rsx:component` has to resolve to this generator by namespace, which

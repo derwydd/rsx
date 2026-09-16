@@ -231,7 +231,7 @@ class ComponentTest < Minitest::Test
     RSX
 
     error = assert_raises(RSX::Error) { render("<div>{AsValue}</div>") }
-    assert_match(/Write <AsValue \/>/, error.message)
+    assert_match(%r{Write <AsValue />}, error.message)
     assert component
   end
 end

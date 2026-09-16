@@ -14,12 +14,7 @@ module RSX
     EMPTY_PROPS = {}.freeze
 
     class << self
-      attr_accessor :rsx_source_path, :rsx_source_digest
-      attr_writer :rsx_cache_options
-
-      def rsx_cache_options
-        @rsx_cache_options
-      end
+      attr_accessor :rsx_source_path, :rsx_source_digest, :rsx_cache_options
 
       # Marks a component whose output never varies. The compiler sets this
       # automatically when a component body is nothing but static markup.
@@ -66,7 +61,7 @@ module RSX
         custom = options[:key]
         payload =
           if custom.nil?
-            (props || EMPTY_PROPS).reject { |key, _| key == :children }
+            (props || EMPTY_PROPS).except(:children)
           elsif custom.respond_to?(:arity) && custom.arity.zero?
             custom.call
           else
@@ -157,9 +152,7 @@ module RSX
 
     # The object that rendered this component: a view context in Rails, the
     # parent component when nested, or nil when rendered directly.
-    def rsx_parent
-      @rsx_parent
-    end
+    attr_reader :rsx_parent
 
     # The nearest non-component render context, i.e. the Rails view. Gives access
     # to url helpers, form builders, `t`, asset helpers and anything else the

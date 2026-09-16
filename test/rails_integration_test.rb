@@ -19,7 +19,7 @@ class RailsIntegrationTest < Minitest::Test
   VIEWS = File.expand_path("fixtures/views", __dir__)
 
   def setup
-    skip "action_view is not installed" unless ACTION_VIEW_AVAILABLE
+    require_rails!(ACTION_VIEW_AVAILABLE, "action_view")
 
     super
     ActionView::Template.register_template_handler(:rsx, RSX::TemplateHandler)

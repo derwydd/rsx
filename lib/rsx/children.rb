@@ -46,9 +46,9 @@ module RSX
     end
 
     # Render props: {children.call(item)} passes a value back to the caller.
-    def call(*arguments, **options, &block)
+    def call(...)
       raw = value
-      return raw.call(*arguments, **options, &block) if raw.respond_to?(:call)
+      return raw.call(...) if raw.respond_to?(:call)
 
       raw
     end

@@ -1,0 +1,88 @@
+AllCops:
+  TargetRubyVersion: 3.0
+  NewCops: enable
+  SuggestExtensions: false
+  Exclude:
+    - "tmp/**/*"
+    - "test/tmp/**/*"
+
+# The transformer and codegen are a scanner and an emitter: their methods are
+# long, branchy dispatch tables by nature, and cutting them up to satisfy a
+# length metric would make them harder to follow, not easier.
+Metrics:
+  Enabled: false
+
+Layout/LineLength:
+  Max: 110
+
+Style/StringLiterals:
+  EnforcedStyle: double_quotes
+
+Style/StringLiteralsInInterpolation:
+  EnforcedStyle: double_quotes
+
+Style/Documentation:
+  Enabled: false
+
+# Generated Ruby is assembled by explicit string building, where a mutable +""
+# is the point.
+Style/StringConcatenation:
+  Enabled: false
+
+Naming/PredicateMethod:
+  Enabled: false
+
+# Compiled templates are evaluated with the .rsx path and a line offset on
+# purpose, so that backtraces point at the template the user wrote rather than
+# at the string that built it.
+Style/EvalWithLocation:
+  Enabled: false
+
+Style/DocumentDynamicEvalDefinition:
+  Enabled: false
+
+# The scanner compares single characters on the hot path, where `c == "a" || c ==
+# "b"` beats building an Array to call include? on.
+Style/MultipleComparison:
+  Enabled: false
+
+# Character tables and patterns are grouped with the private methods that use
+# them, which reads better than hoisting them all to the top of the class.
+Lint/UselessConstantScoping:
+  Enabled: false
+
+# <Theme.Provider> is spelled the way React spells it, so the method and its
+# memo are capitalised to match.
+Naming/MemoizedInstanceVariableName:
+  Enabled: false
+
+# `cache expires_in: 300` and `cache true` are both part of the component DSL.
+Style/OptionalBooleanParameter:
+  Enabled: false
+
+# SafeString#*(times) says what the argument is.
+Naming/BinaryOperatorParameterName:
+  Enabled: false
+
+# Cache stores implement a fixed interface, so a store that ignores expires_in
+# still has to accept it.
+Lint/UnusedMethodArgument:
+  AllowUnusedKeywordArguments: true
+
+# Load order is part of the contract, so it is stated rather than inherited from
+# the platform's glob ordering.
+Lint/RedundantDirGlobSort:
+  Enabled: false
+
+Style/FormatStringToken:
+  Exclude:
+    - "lib/rsx/tasks.rake"
+
+# The gem is published as rsx-rb, so this is the file Bundler requires.
+Naming/FileName:
+  Exclude:
+    - "lib/rsx-rb.rb"
+
+Metrics/BlockLength:
+  Exclude:
+    - "test/**/*"

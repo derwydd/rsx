@@ -37,7 +37,10 @@ module RSX
         opts.on("-c", "--cache-dir DIR", "Directory for compiled output") do |dir|
           options[:cache_dir] = dir
         end
-        opts.on("-h", "--help", "Show this message") { puts opts; return 0 }
+        opts.on("-h", "--help", "Show this message") do
+          puts opts
+          return 0
+        end
       end
 
       arguments = parser.parse(argv)

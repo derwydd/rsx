@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: Ruby ${{ matrix.ruby }} / Rails ${{ matrix.rails }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The Rails integration is optional, so it is tested against each
+          # supported ActionView and the suite is also run without Rails at all
+          # to keep the zero-dependency claim honest.
+          - { ruby: "3.0", rails: "none" }
+          - { ruby: "3.1", rails: "7.1" }
+          - { ruby: "3.2", rails: "7.2" }
+          - { ruby: "3.3", rails: "8.0" }
+          - { ruby: "3.4", rails: "8.0" }
+          - { ruby: "3.4", rails: "none" }
+    env:
+      RAILS_VERSION: ${{ matrix.rails }}
+      # Turns a missing ActionView into a failure instead of a skipped test, so
+      # the Rails suite cannot quietly stop running.
+      RSX_REQUIRE_RAILS: ${{ matrix.rails != 'none' && '1' || '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.ruby }}
+          bundler-cache: true
+      - run: bundle exec rake test
+
+  lint:
+    name: RuboCop
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+          bundler-cache: true
+      - run: bundle exec rubocop
+
+  gem:
+    name: Build the gem
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+          bundler-cache: true
+      # Catches a gemspec that ships the wrong files, which is invisible until
+      # someone installs the published gem.
+      - run: gem build rsx.gemspec
+      - run: |
+          gem install --local rsx-rb-*.gem
+          ruby -e 'require "rsx"; puts RSX.render_source(%(<p>ok</p>))'

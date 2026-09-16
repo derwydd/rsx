@@ -7,7 +7,7 @@ module RSX
   # template gets the whole component toolkit (children, caching, context,
   # helpers) and is compiled once no matter how often it is rendered.
   class Template
-    attr_reader :path, :digest
+    attr_reader :path, :digest, :component
 
     def self.load(path)
       absolute = File.expand_path(path)
@@ -22,7 +22,7 @@ module RSX
 
     def initialize(source, path: nil)
       digest = RSX.config.compile_cache.digest(source.to_s)
-      ruby = RSX.config.compile_cache.fetch(path || "template", source.to_s) do
+      ruby = RSX.config.compile_cache.fetch_or_compile(path || "template", source.to_s) do
         Transformer.transform(source.to_s, path: path)
       end
       build(ruby, path, digest)
@@ -38,10 +38,6 @@ module RSX
       else
         RSX.safe(RSX.child(value))
       end
-    end
-
-    def component
-      @component
     end
 
     private

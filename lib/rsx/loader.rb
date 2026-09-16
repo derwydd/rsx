@@ -59,7 +59,7 @@ module RSX
         @stack.push(entry)
 
         begin
-          ruby = compile_cache.fetch(absolute, source) do
+          ruby = compile_cache.fetch_or_compile(absolute, source) do
             Transformer.transform(source, path: absolute)
           end
 
@@ -98,7 +98,9 @@ module RSX
     # Reloads only the files whose contents changed. Used by the Rails reloader.
     def reload!
       @monitor.synchronize do
-        @entries.values.each do |entry|
+        # values takes a snapshot, which each_value would not: the body reloads
+        # and deletes entries while iterating.
+        @entries.values.each do |entry| # rubocop:disable Style/HashEachMethods
           if !File.file?(entry.path)
             unload(entry)
             @entries.delete(entry.path)

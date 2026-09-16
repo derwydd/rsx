@@ -150,14 +150,14 @@ class CacheTest < Minitest::Test
     Dir.mktmpdir do |dir|
       RSX.config.cache_dir = dir
       source = "<p>cached</p>"
-      first = RSX.config.compile_cache.fetch("demo.rsx", source) { RSX.compile(source) }
+      first = RSX.config.compile_cache.fetch_or_compile("demo.rsx", source) { RSX.compile(source) }
 
       files = Dir.children(dir)
       assert_equal 1, files.length
 
       # A fresh cache in the same directory reads the file instead of compiling.
       RSX.config.cache_dir = dir
-      second = RSX.config.compile_cache.fetch("demo.rsx", source) { flunk "recompiled" }
+      second = RSX.config.compile_cache.fetch_or_compile("demo.rsx", source) { flunk "recompiled" }
       assert_equal first, second
     end
   end
@@ -172,7 +172,7 @@ class CacheTest < Minitest::Test
       RSX.config.cache_dir = cache
       RSX.precompile!
 
-      assert_equal 2, Dir.children(cache).count { |file| file.end_with?(".rb") }
+      assert_equal(2, Dir.children(cache).count { |file| file.end_with?(".rb") })
     end
   end
 end

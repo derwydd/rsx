@@ -34,7 +34,7 @@ module RSX
   #
   # Compiled markup reads a slot directly and only calls define_static on a miss,
   # so the render path is a bare Hash read and the lock is paid once per slot.
-  STATICS = {}
+  STATICS = {} # rubocop:disable Style/MutableConstant
   STATICS_LOCK = Mutex.new
 
   # Configuration is intentionally small: where to find components, where to put
@@ -142,7 +142,7 @@ module RSX
     def precompile!(paths = config.paths)
       loader.files(paths).each do |file|
         source = File.read(file)
-        config.compile_cache.fetch(file, source) { Transformer.transform(source, path: file) }
+        config.compile_cache.fetch_or_compile(file, source) { Transformer.transform(source, path: file) }
       end
     end
 
@@ -170,7 +170,7 @@ module RSX
 
     def render_file(path, context: nil, **props)
       entry = loader.load(loader.resolve!(path))
-      props = props.empty? ? nil : props
+      props = nil if props.empty?
       component = entry.renderable
 
       if component
@@ -336,9 +336,7 @@ module RSX
     # Emitted by `export Name`.
     def export(component, from: nil)
       entry = loader.current_entry || (from && loader.entries.find { |candidate| candidate.path == from })
-      if entry && !entry.components.include?(component)
-        entry.components << component
-      end
+      entry.components << component if entry && !entry.components.include?(component)
       component
     end
 
@@ -385,7 +383,9 @@ module RSX
       parts = name.split("::")
       target = Object
       parts[0..-2].each do |part|
-        return unless target.const_defined?(part, false)
+        # Walking off the namespace means there is nothing to remove, which ends
+        # the method rather than the iteration.
+        return unless target.const_defined?(part, false) # rubocop:disable Lint/NonLocalExitFromIterator
 
         target = target.const_get(part, false)
       end
@@ -440,4 +440,4 @@ module RSX
   end
 end
 
-require_relative "rsx/railtie" if defined?(::Rails::Railtie)
+require_relative "rsx/railtie" if defined?(Rails::Railtie)

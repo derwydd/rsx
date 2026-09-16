@@ -9,4 +9,11 @@ Rake::TestTask.new(:test) do |t|
   t.warning = false
 end
 
-task default: :test
+begin
+  require "rubocop/rake_task"
+  RuboCop::RakeTask.new
+rescue LoadError
+  # RuboCop is a development dependency, so its task is optional.
+end
+
+task default: %i[test rubocop]

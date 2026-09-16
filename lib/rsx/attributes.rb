@@ -204,7 +204,7 @@ module RSX
         case value
         when Proc, Method
           "Event handlers are HTML attributes, not callbacks: pass the JavaScript " \
-            "to run as a string, as in onClick=\"submit()\"."
+          "to run as a string, as in onClick=\"submit()\"."
         when Hash
           "Only class, style, data and aria accept a Hash."
         when Array
@@ -226,7 +226,6 @@ module RSX
       case value
       when nil, false, true then []
       when String then value.empty? ? [] : [value]
-      when Symbol then [value.to_s]
       when Array then value.flat_map { |item| class_tokens(item) }
       when Hash then value.filter_map { |token, on| token.to_s if on }
       else [value.to_s]

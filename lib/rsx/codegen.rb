@@ -101,11 +101,11 @@ module RSX
       end
 
       if node.children.empty?
-        if node.self_closing && Attributes.self_closing?(tag)
-          parts << [:static, "/>", last_line(parts, node)]
-        else
-          parts << [:static, "></#{tag}>", last_line(parts, node)]
-        end
+        parts << if node.self_closing && Attributes.self_closing?(tag)
+                   [:static, "/>", last_line(parts, node)]
+                 else
+                   [:static, "></#{tag}>", last_line(parts, node)]
+                 end
         return
       end
 

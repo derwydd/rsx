@@ -25,8 +25,10 @@ module RSX
       Digest::SHA256.hexdigest("#{COMPILER_VERSION}\0#{source}")[0, 32]
     end
 
-    # Returns the compiled Ruby for source, compiling only on a cache miss.
-    def fetch(path, source)
+    # Returns the compiled Ruby for source, compiling only on a cache miss. Not
+    # named fetch: both arguments identify the entry, so a reader expecting
+    # Hash#fetch would take source for a default value.
+    def fetch_or_compile(path, source)
       key = digest(source)
       cached = @lock.synchronize { @memory[key] }
       return cached if cached

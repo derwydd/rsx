@@ -21,6 +21,16 @@ module RSXTest
     RSX.reset!
   end
 
+  # Rails is optional, so its tests skip when it is not installed. CI sets
+  # RSX_REQUIRE_RAILS for the runs that do install it, where a skip would mean
+  # the whole Rails suite had quietly stopped running.
+  def require_rails!(available, what)
+    return if available
+
+    flunk "#{what} was expected but could not be loaded" if ENV["RSX_REQUIRE_RAILS"].to_s != ""
+    skip "#{what} is not installed"
+  end
+
   # Renders .rsx source as a template.
   def render(source, **props)
     RSX.render_source(source, **props).to_s

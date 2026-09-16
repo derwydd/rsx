@@ -5,7 +5,8 @@ require_relative "lib/rsx/version"
 Gem::Specification.new do |spec|
   spec.name = "rsx-rb"
   spec.version = RSX::VERSION
-  spec.authors = ["RSX contributors"]
+  spec.authors = ["Jason Brock"]
+  spec.email = ["jasonallenbrock@gmail.com"]
 
   spec.summary = "JSX-style templates for Ruby and Rails."
   spec.description = <<~DESC
@@ -17,12 +18,12 @@ Gem::Specification.new do |spec|
     dependencies; Rails integration is optional and loads automatically when present.
   DESC
 
-  spec.homepage = "https://github.com/rsx-rb/rsx"
+  spec.homepage = "https://github.com/derwydd/rsx"
   spec.license = "MIT"
   spec.required_ruby_version = ">= 3.0.0"
 
-  spec.metadata["homepage_uri"] = spec.homepage
   spec.metadata["source_code_uri"] = spec.homepage
+  spec.metadata["bug_tracker_uri"] = "#{spec.homepage}/issues"
   spec.metadata["changelog_uri"] = "#{spec.homepage}/blob/main/CHANGELOG.md"
   spec.metadata["rubygems_mfa_required"] = "true"
 
