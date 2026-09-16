@@ -39,6 +39,39 @@ class RubySyntaxTest < Minitest::Test
     assert_equal "<p>ab</p>", render(%(<p>{(+"a") << "b"}</p>))
   end
 
+  # Ruby reads `a <<b` as an append because a value already ended the expression,
+  # so the second "<" must not be left in a position where it opens a tag.
+  def test_shovel_operator_without_a_space
+    assert_equal "<p>ab</p>", render(%(<p>{(+"a") <<"b"}</p>))
+  end
+
+  def test_shovel_operator_followed_by_markup
+    assert_equal "<p><i>x</i></p>", render(%(<p>{RSX.raw("") << <i>x</i>}</p>))
+  end
+
+  # `method <div>...</div>` is a comparison to Ruby, so it silently compiles to
+  # nonsense unless the mistake is named where it happens.
+  def test_markup_in_argument_position_is_reported
+    error = assert_raises(RSX::SyntaxError) { compile("x = tag <div>hi</div>") }
+    assert_includes error.message, "needs parentheses"
+  end
+
+  def test_markup_in_argument_position_when_self_closing
+    assert_raises(RSX::SyntaxError) { compile("x = tag <br />") }
+  end
+
+  def test_parenthesised_markup_in_argument_position_is_fine
+    assert_equal "<p><i>x</i></p>", render("<p>{String(<i>x</i>)}</p>")
+  end
+
+  # The diagnostic must not fire on ordinary comparisons.
+  def test_comparisons_are_not_mistaken_for_markup
+    assert_equal "x = a < b", compile("x = a < b")
+    assert_equal "x = a<b", compile("x = a<b")
+    assert_equal "x = a <=> b", compile("x = a <=> b")
+    assert_equal "x = a <= b", compile("x = a <= b")
+  end
+
   def test_spaceship_operator
     assert_equal "<p>-1</p>", render("<p>{1 <=> 2}</p>")
   end

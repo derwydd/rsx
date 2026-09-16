@@ -49,6 +49,8 @@ module RSX
       case node
       when Nodes::Text
         parts << [:static, Escape.static_text(node.value), node.line]
+      when Nodes::RawText
+        parts << [:static, node.value, node.line]
       when Nodes::Expression
         # The extra parentheses let a container hold anything Ruby accepts as an
         # expression, including modifiers: {greeting if signed_in?}.
@@ -83,7 +85,7 @@ module RSX
       if attributes.any? { |attribute| attribute.kind == :spread }
         emit_spread_attributes(attributes, parts)
       else
-        attributes.each { |attribute| emit_attribute(attribute, parts) }
+        dedupe(attributes).each { |attribute| emit_attribute(attribute, parts) }
       end
 
       if inner_html
@@ -137,6 +139,20 @@ module RSX
         end
 
       parts << [:dynamic, source, attributes.first.line]
+    end
+
+    # Two props naming the same HTML attribute would otherwise be written twice,
+    # which is invalid HTML and inverts the result: React keeps the last value,
+    # browsers keep the first. Matches Attributes.merge by holding the first
+    # position and taking the last value.
+    def dedupe(attributes)
+      return attributes if attributes.length < 2
+
+      # Reassigning a Hash key keeps its original position and takes the new
+      # value, which is the merge rule verbatim.
+      by_name = {}
+      attributes.each { |attribute| by_name[Attributes.canonical_name(attribute.name)] = attribute }
+      by_name.length == attributes.length ? attributes : by_name.values
     end
 
     def attribute_pair(attribute)

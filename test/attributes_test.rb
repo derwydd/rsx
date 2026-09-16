@@ -138,6 +138,34 @@ class AttributesTest < Minitest::Test
     assert_equal "<li>x</li>", render(%(<li key={1} ref="r">x</li>))
   end
 
+  # Emitting both would be invalid HTML and would invert the result, since
+  # browsers keep the first attribute where React keeps the last value.
+  def test_duplicate_attributes_keep_the_last_value
+    assert_equal %(<div class="b"></div>), render(%(<div className="a" className="b" />))
+  end
+
+  def test_duplicate_attributes_match_across_prop_spellings
+    assert_equal %(<div class="b"></div>), render(%(<div class="a" className="b" />))
+  end
+
+  def test_a_duplicate_expression_wins_over_a_literal
+    assert_equal %(<div id="b"></div>), render(%(<div id="a" id={props[:i]} />), i: "b")
+  end
+
+  def test_a_callable_attribute_value_is_rejected
+    error = assert_raises(ArgumentError) { render(%(<button onClick={-> { 1 }}>x</button>)) }
+    assert_includes error.message, "Event handlers are HTML attributes"
+  end
+
+  def test_a_hash_attribute_value_is_rejected
+    error = assert_raises(ArgumentError) { render(%(<div title={{ a: 1 }} />)) }
+    assert_includes error.message, "Only class, style, data and aria accept a Hash"
+  end
+
+  def test_an_array_attribute_value_is_rejected
+    assert_raises(ArgumentError) { render(%(<div title={[1, 2]} />)) }
+  end
+
   # Attribute names go into the tag unescaped, so a hash key that closes the
   # quote would otherwise inject an attribute of the attacker's choosing.
   def test_data_keys_cannot_inject_an_attribute

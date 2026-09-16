@@ -7,6 +7,9 @@ module RSX
     # Literal markup text, already whitespace-normalized JSX style.
     Text = Struct.new(:value, :line)
 
+    # The body of a raw text element (<script>, <style>), emitted byte for byte.
+    RawText = Struct.new(:value, :line)
+
     # {ruby} in child position.
     Expression = Struct.new(:source, :line)
 

@@ -62,6 +62,7 @@ module RSX
       @pending_loop = false
       @jsx_spans = []
       @components = 0
+      @preformatted = 0
       # Static markup slots are keyed by a digest of the source, so recompiling
       # the same file reuses the same slots instead of leaking new ones.
       @codegen = Codegen.new(path: path, prefix: "#{Digest::SHA256.hexdigest(@src)[0, 10]}-")
@@ -189,6 +190,7 @@ module RSX
           elsif @prev == :start && jsx_ahead?
             emit_jsx
           else
+            reject_misplaced_markup
             copy_operator
           end
         when "/"
@@ -239,6 +241,12 @@ module RSX
 
       # `::` and `?.`-like sequences are copied whole so state stays accurate.
       if char == ":" && peek(1) == ":"
+        copy(2)
+        @prev = :start
+      elsif char == "<" && peek(1) == "<"
+        # Reached only when this is not a heredoc, so it is an append: copy both
+        # characters at once, or the second one lands in expression position and
+        # `list <<x` reads as a tag.
         copy(2)
         @prev = :start
       elsif char == ":" && symbol_ahead?
@@ -760,6 +768,27 @@ module RSX
       !after.nil? && TAG_START.match?(after)
     end
 
+    # A tag that opens and closes on one line, used only to recognise a mistake.
+    MISPLACED_MARKUP = %r{\A<([A-Za-z][A-Za-z0-9_\-.:]*)(?:[ \t]*/>|[^<>\n]*>)}
+
+    # `render <div>x</div>` is not markup to Ruby, it is a chain of comparisons,
+    # because a value already ended the expression. Left alone it compiles to
+    # something that fails far from the real mistake, so name it here instead.
+    #
+    # The check demands a space before `<` and none after, which is how markup is
+    # written and how comparisons are not, so `a < b` and `a<b` never reach it.
+    def reject_misplaced_markup
+      return unless @prev == :value
+      return unless /[ \t]/.match?(@src[@pos - 1].to_s)
+
+      match = MISPLACED_MARKUP.match(@src[@pos..])
+      return if match.nil?
+      return unless match[0].end_with?("/>") || @src.index("</#{match[1]}>", @pos)
+
+      error("markup here needs parentheses: `method(<#{match[1]} ... />)`. Ruby reads a " \
+            "`<` that follows a value as a comparison, so the markup never starts.")
+    end
+
     def emit_jsx
       start_pos = @pos
       start_line = @line
@@ -796,11 +825,58 @@ module RSX
       advance
 
       # Void elements are complete at ">": HTML gives them no closing tag.
-      return build_node(tag, attributes, [], true, line) if Attributes.void?(tag)
+      if Attributes.void?(tag)
+        reject_void_closing_tag(tag, line)
+        return build_node(tag, attributes, [], true, line)
+      end
 
-      children = parse_children(tag)
+      children =
+        if Attributes.raw_text?(tag)
+          parse_raw_text(tag)
+        else
+          parse_element_children(tag)
+        end
+
       expect_closing_tag(tag)
       build_node(tag, attributes, children, false, line)
+    end
+
+    def parse_element_children(tag)
+      @preformatted += 1 if Attributes.preformatted?(tag)
+      parse_children(tag)
+    ensure
+      @preformatted -= 1 if Attributes.preformatted?(tag)
+    end
+
+    # The body of <script> or <style>. HTML treats these as raw text, so nothing
+    # inside is markup: `.a > .b`, `if (a < b)` and JavaScript object literals are
+    # all just characters. Dynamic content goes through dangerouslySetInnerHTML.
+    def parse_raw_text(tag)
+      start = @pos
+      start_line = @line
+      closing = "</#{tag}"
+
+      until eof?
+        break if peek == "<" && lookahead(closing.length).to_s.casecmp?(closing)
+
+        advance
+      end
+
+      error("unterminated <#{tag}> element", line: start_line) if eof?
+
+      body = @src[start...@pos]
+      body.empty? ? [] : [Nodes::RawText.new(body, start_line)]
+    end
+
+    # `<br>text</br>` parses as a complete <br> followed by `text</br>`, which is
+    # then copied out as Ruby and fails in the generated file instead of here.
+    def reject_void_closing_tag(tag, line)
+      index = @src.index("<", @pos)
+      return if index.nil?
+      return unless /\A<\/#{Regexp.escape(tag)}[ \t]*>/i.match?(@src[index..])
+
+      error("<#{tag}> is a void element: it takes no children and has no closing tag. " \
+            "Write `<#{tag} />`.", line: line)
     end
 
     def build_node(tag, attributes, children, self_closing, line)
@@ -996,6 +1072,13 @@ module RSX
 
     def flush_text(children, text, line)
       return if text.empty?
+
+      # Inside <pre> or <textarea> the browser shows whitespace as written, so
+      # collapsing it the way JSX does elsewhere would change the output.
+      if @preformatted.positive?
+        children << Nodes::Text.new(text, line)
+        return
+      end
 
       normalized = self.class.normalize_text(text)
       children << Nodes::Text.new(normalized, line) unless normalized.empty?

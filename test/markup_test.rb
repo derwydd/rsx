@@ -97,6 +97,77 @@ class MarkupTest < Minitest::Test
                  render(%(<div dangerouslySetInnerHTML={{ __html: "<b>raw</b>" }} />))
   end
 
+  # <script> and <style> are raw text in HTML, so their contents are not markup.
+  def test_style_bodies_are_raw_text
+    assert_equal "<style>.a > .b { color: red }</style>",
+                 render("<style>.a > .b { color: red }</style>")
+  end
+
+  def test_script_bodies_are_raw_text
+    assert_equal "<script>if (a < b) { f({x: 1}); }</script>",
+                 render("<script>if (a < b) { f({x: 1}); }</script>")
+  end
+
+  def test_script_body_may_contain_a_closing_tag_in_a_string
+    assert_equal %(<script>var a = "</div>";</script>),
+                 render(%(<script>var a = "</div>";</script>))
+  end
+
+  def test_script_body_is_not_escaped
+    assert_equal "<script>a && b</script>", render("<script>a && b</script>")
+  end
+
+  def test_empty_script_still_gets_a_closing_tag
+    assert_equal %(<script src="/a.js"></script>), render(%(<script src="/a.js"></script>))
+  end
+
+  def test_unterminated_raw_text_element_is_reported
+    error = assert_raises(RSX::SyntaxError) { render("<script>var a = 1;") }
+    assert_includes error.message, "unterminated <script> element"
+  end
+
+  def test_dynamic_script_content_goes_through_inner_html
+    assert_equal "<script>var a = 1;</script>",
+                 render(%(<script dangerouslySetInnerHTML={{ __html: props[:j] }} />), j: "var a = 1;")
+  end
+
+  def test_void_elements_reject_a_closing_tag
+    error = assert_raises(RSX::SyntaxError) { render("<br></br>") }
+    assert_includes error.message, "<br> is a void element"
+  end
+
+  def test_void_elements_reject_children
+    assert_raises(RSX::SyntaxError) { render(%(<div><img src="a">alt</img></div>)) }
+  end
+
+  def test_a_void_element_before_a_closing_tag_is_fine
+    assert_equal "<div><br></div>", render("<div><br></div>")
+    assert_equal "<div><br><br></div>", render("<div><br /><br /></div>")
+  end
+
+  # Whitespace is significant inside <pre> and <textarea>, so JSX's line joining
+  # would change what the browser shows.
+  def test_pre_preserves_whitespace
+    assert_equal "<pre>\n  a\n    b\n</pre>", render("<pre>\n  a\n    b\n</pre>")
+  end
+
+  def test_pre_preserves_whitespace_in_nested_elements
+    assert_equal "<pre><code>\n  a\n    b\n</code></pre>",
+                 render("<pre><code>\n  a\n    b\n</code></pre>")
+  end
+
+  def test_textarea_preserves_whitespace
+    assert_equal "<textarea>\n  hi\n</textarea>", render("<textarea>\n  hi\n</textarea>")
+  end
+
+  def test_pre_still_interpolates
+    assert_equal "<pre>\n  v\n</pre>", render("<pre>\n  {props[:x]}\n</pre>", x: "v")
+  end
+
+  def test_the_same_element_outside_pre_still_collapses
+    assert_equal "<code>a b</code>", render("<code>\n  a\n  b\n</code>")
+  end
+
   def test_multiline_element_with_attributes
     source = <<~RSX
       <a

@@ -111,6 +111,15 @@ module RSX
       feTurbulence mpath set
     ].to_h { |name| [name, true] }.freeze
 
+    # Elements whose content is raw text rather than markup. HTML gives these no
+    # child elements and no character references, so `<`, `>` and `{` inside them
+    # are ordinary characters: CSS selectors and JavaScript work as written.
+    RAW_TEXT = %w[script style].to_h { |name| [name, true] }.freeze
+
+    # Elements where whitespace is significant, so JSX's line-joining rules
+    # would change what the browser displays.
+    PREFORMATTED = %w[pre textarea listing plaintext].to_h { |name| [name, true] }.freeze
+
     # CSS properties that take a bare number (everything else gets "px").
     UNITLESS_CSS = %w[
       animation-iteration-count aspect-ratio border-image-outset border-image-slice
@@ -170,13 +179,39 @@ module RSX
       SELF_CLOSING.key?(tag)
     end
 
+    def raw_text?(tag)
+      RAW_TEXT.key?(tag)
+    end
+
+    def preformatted?(tag)
+      PREFORMATTED.key?(tag)
+    end
+
     # Renders one attribute, including its leading space: ` href="/x"`.
     def render(name, value)
       case value
       when nil, false then ""
       when true then boolean?(name) ? " #{name}" : %( #{name}="true")
+      when Proc, Method, Hash, Array then raise ArgumentError, unrenderable(name, value)
       else %( #{name}="#{Escape.attribute(value)}")
       end
+    end
+
+    # An attribute can only ever be a string, so these types are always a mistake
+    # rather than a value to inspect into the document.
+    def unrenderable(name, value)
+      advice =
+        case value
+        when Proc, Method
+          "Event handlers are HTML attributes, not callbacks: pass the JavaScript " \
+            "to run as a string, as in onClick=\"submit()\"."
+        when Hash
+          "Only class, style, data and aria accept a Hash."
+        when Array
+          "Only class accepts an Array."
+        end
+
+      "cannot render #{value.class} as the #{name} attribute. #{advice}"
     end
 
     # class={...} accepts a String, Symbol, Array or Hash.
