@@ -126,10 +126,22 @@ module RSX
     # Props that describe the element to RSX rather than to the browser.
     IGNORED = %w[key ref children suppressHydrationWarning].to_h { |name| [name, true] }.freeze
 
-    INVALID_NAME = %r{[\s"'>/=\0]}
+    INVALID_NAME = %r{[\s"'<>/=\0]}
     CAMEL_BOUNDARY = /([a-z0-9])([A-Z])/
 
     module_function
+
+    # Attribute names are written into the tag verbatim, so a name carrying a
+    # quote or a space would end the attribute and start a new one. Values are
+    # escaped, but names cannot be, which is why anything malformed is refused
+    # rather than mangled into something that still parses as HTML.
+    def validate_name!(name)
+      return name unless name.empty? || name.match?(INVALID_NAME)
+
+      raise ArgumentError,
+            "#{name.inspect} is not a usable HTML attribute name. Attribute names are " \
+            "written into the tag as-is, so they cannot come from untrusted input."
+    end
 
     # Maps a prop name to its HTML attribute name, or nil when the prop should
     # not be rendered at all.
@@ -235,7 +247,8 @@ module RSX
           # Like React, data-* and aria-* keep booleans as the strings "true"
           # and "false" rather than becoming bare attributes: ARIA values are
           # enumerated, so `aria-hidden` alone means nothing.
-          %( #{prefix}-#{css_property(key)}="#{Escape.attribute(nested_value(raw))}")
+          name = validate_name!("#{prefix}-#{css_property(key)}")
+          %( #{name}="#{Escape.attribute(nested_value(raw))}")
         end.join
       else render(prefix, value)
       end
@@ -302,9 +315,9 @@ module RSX
         when "dangerouslySetInnerHTML" then next
         else
           name = attribute_name(prop)
-          next if name.nil? || name.empty? || name.match?(INVALID_NAME)
+          next if name.nil? || name.empty?
 
-          out << render(name, value)
+          out << render(validate_name!(name), value)
         end
       end
       out

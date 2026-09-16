@@ -138,6 +138,30 @@ class AttributesTest < Minitest::Test
     assert_equal "<li>x</li>", render(%(<li key={1} ref="r">x</li>))
   end
 
+  # Attribute names go into the tag unescaped, so a hash key that closes the
+  # quote would otherwise inject an attribute of the attacker's choosing.
+  def test_data_keys_cannot_inject_an_attribute
+    error = assert_raises(ArgumentError) do
+      render(%(<div data={props[:d]}></div>), d: { %(x" onmouseover="alert(1)) => 1 })
+    end
+    assert_includes error.message, "not a usable HTML attribute name"
+  end
+
+  def test_aria_keys_cannot_inject_an_attribute
+    assert_raises(ArgumentError) { render(%(<div aria={props[:a]}></div>), a: { "x>y" => 1 }) }
+  end
+
+  def test_spread_keys_cannot_inject_an_attribute
+    error = assert_raises(ArgumentError) do
+      render(%(<div {**props[:attrs]}></div>), attrs: { %(x" onclick="go()) => "1" })
+    end
+    assert_includes error.message, "not a usable HTML attribute name"
+  end
+
+  def test_data_keys_with_legal_punctuation_still_work
+    assert_equal %(<div data-a.b="1"></div>), render(%(<div data={props[:d]}></div>), d: { "a.b" => 1 })
+  end
+
   def test_dashed_and_snake_case_attributes_pass_through
     assert_equal %(<div data-controller="modal" my_attr="1"></div>),
                  render(%(<div data-controller="modal" my_attr="1"></div>))
