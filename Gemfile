@@ -13,7 +13,7 @@ end
 # RSX has no runtime dependencies and its Rails integration activates only when
 # Rails is already loaded, so the suite has to pass both with and without it.
 # RAILS_VERSION picks which ActionView to test against; "none" leaves it out.
-rails_version = ENV.fetch("RAILS_VERSION", "8.0")
+rails_version = ENV.fetch("RAILS_VERSION", "8.1")
 
 unless rails_version == "none"
   group :test do

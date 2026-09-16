@@ -320,6 +320,15 @@ rows   = items.map { |i| <li>{i}</li> }   # block body
 return <p>{n < 10 ? "few" : "many"}</p>   # comparison inside a container
 ```
 
+A method call is a value, so markup as a bare argument needs parentheses — `wrap <div>x</div>`
+would be a chain of comparisons to Ruby. RSX reports that where you wrote it instead of letting
+it compile:
+
+```ruby
+wrap(<div>x</div>)   # ✓
+wrap <div>x</div>    # ✗ "markup here needs parentheses"
+```
+
 ### Fragments
 
 Multiple sibling elements need one parent. Use `<>...</>` when you do not want a wrapper
@@ -420,6 +429,28 @@ joined with a single space. So this…
 
 …renders `<p>Hello, world</p>`. Use `{" "}` when you need a space JSX would have collapsed.
 
+Inside `<pre>` and `<textarea>` whitespace is significant, so RSX leaves it exactly as written
+rather than joining lines. This is one of the few places RSX deliberately parts ways with JSX,
+which would collapse it and change what the browser displays.
+
+### `<script>` and `<style>`
+
+HTML treats these two as *raw text*: no child elements, no character references. RSX does the
+same, so their contents are passed through byte for byte and nothing inside is markup:
+
+```ruby
+<style>.card > .title { color: red }</style>
+<script>if (a < b) { render({ x: 1 }); }</script>
+```
+
+Selectors with `>`, JavaScript comparisons, object literals and `"</div>"` inside a string all
+work as written. Since the body is not parsed, `{}` is not an expression container either — to
+put dynamic content in a script, use `dangerouslySetInnerHTML`:
+
+```ruby
+<script dangerouslySetInnerHTML={{ __html: "window.config = #{RSX.json(config)}" }} />
+```
+
 ### Escaping and raw HTML
 
 Interpolated values are HTML-escaped. Strings already marked safe (RSX's own output, and
@@ -491,6 +522,11 @@ Following React, booleans become the strings `"true"`/`"false"`, and `nil` drops
 # => <div data-user-id="7" data-ids="[1,2]" aria-label="Close" aria-hidden="true"></div>
 ```
 
+Values are escaped, but a *name* is written into the tag as-is, so it cannot be. A key that is
+not a usable attribute name — one carrying a space, a quote or an angle bracket — raises
+`ArgumentError` rather than being emitted, since otherwise a key built from untrusted input
+could close the attribute and start another one. The same applies to spread keys.
+
 ### Spread
 
 Both the JSX and the Ruby spelling are accepted:
@@ -504,6 +540,10 @@ Attributes on an element with a spread are merged the way React merges props: na
 the same HTML attribute collapse, keeping the last value. So `className="link"` above overrides
 a `class` or `className` coming from `attrs`, rather than emitting the attribute twice. A `nil`
 or `false` spread contributes nothing.
+
+Two attributes naming the same HTML attribute collapse the same way without a spread, at compile
+time: `<div className="a" className="b" />` renders `class="b"`. Emitting both would be invalid
+HTML *and* pick the opposite winner, since browsers keep the first.
 
 Spread works on components too, where it becomes keyword arguments.
 
@@ -519,6 +559,10 @@ There is no client-side runtime, so handlers are strings — the value of an HTM
 For real interactivity, use the attributes your JS framework expects
 (`data-controller`, `data-action`, `hx-post`, …) — they pass through untouched.
 
+Passing a lambda raises, rather than writing `#<Proc…>` into the document. So do a `Hash` or
+`Array` given to an attribute that does not take one — only `class` accepts an Array, and only
+`class`, `style`, `data` and `aria` accept a Hash.
+
 ### Void and self-closing elements
 
 Void elements never get a closing tag, whether or not you write `/`:
@@ -528,6 +572,9 @@ Void elements never get a closing tag, whether or not you write `/`:
 <img src={u}> # => <img src="...">
 <circle r={4} />  # SVG keeps XML self-closing syntax => <circle r="4"/>
 ```
+
+They also take no children and have no closing tag, so `<br></br>` and `<img src={u}>alt</img>`
+are reported as errors where they are written.
 
 ---
 
@@ -834,6 +881,25 @@ Any view, partial or layout can be `.html.rsx`. Inside one, `self` is the view c
 Partial locals are local variables, exactly as in ERB. Output is html-safe, so `.rsx` and ERB
 templates can render each other freely.
 
+Rails' strict locals comment works too, since it is an ordinary Ruby comment in `.rsx`:
+
+```ruby
+# locals: (author:, byline_class: "byline")
+<p className={byline_class}>{author.name}</p>
+```
+
+`.rsx` templates also take part in Rails' template digests, so a `cache` block wrapping an `.rsx`
+partial is invalidated when that partial — or any partial it renders — changes.
+
+### Generating a component
+
+```bash
+bin/rails generate rsx:component Card title body
+```
+
+Writes `app/components/card.rsx` (or into the first entry of `config.rsx.paths`) with `title:` and
+`body:` as keyword props.
+
 ### Components from ERB, Haml or Slim
 
 ```erb
@@ -928,7 +994,7 @@ where compiled output goes, `-p/--prop NAME=VALUE` passes a string prop.
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
-| `paths` | `app/components`, `app/rsx` (Rails) | Directories searched for `.rsx` files and imports |
+| `paths` | `app/components`, `app/rsx` (Rails) | Directories searched for `.rsx` files and imports; also the limit of what can be resolved |
 | `cache_dir` | `tmp/cache/rsx` | Where compiled Ruby is stored; `nil` compiles in memory |
 | `cache_store` | `RSX::Cache::Memory` | Store for component and fragment caches |
 | `component_namespace` | `Object` | Module that `component Name` constants are defined under |
@@ -937,6 +1003,11 @@ where compiled output goes, `-p/--prop NAME=VALUE` passes a string prop.
 Useful entry points on the `RSX` module: `compile`, `load`, `load_all`, `reload!`,
 `precompile!`, `render`, `render_file`, `render_source`, `template`, `lookup_component`,
 `create_context`, `cache`, `config`, `configure`, `reset!`.
+
+Loading a template evaluates it, so resolution only ever matches `.rsx` files inside `paths` or
+the working directory — `../` cannot climb out of them, and an absolute path elsewhere is refused.
+A path from a request therefore cannot reach anything else on disk, though it is still better to
+map user input to a known set of templates than to pass it to `render_file` directly.
 
 ---
 
@@ -954,9 +1025,16 @@ runtime differences are worth stating plainly:
   `&&`/`||` semantics differ around `0` and `""`, and `nil` replaces `null`/`undefined`.
 - **Expression containers only exist inside markup.** At the top level of a template file, `{}`
   is a Ruby hash.
-- **Whitespace, escaping, fragments, spread, `dangerouslySetInnerHTML`, `className`/`style`
-  handling, boolean and `data`/`aria` attributes, children, render props, context, and
-  `import`/`export default`** all behave as they do in React.
+- **`<pre>` and `<textarea>` keep their whitespace** instead of having it collapsed. JSX collapses
+  it, which for server-rendered HTML just changes what the browser shows.
+- **`<script>` and `<style>` are raw text**, as HTML defines them, so `{}` is not an expression
+  container inside them. Use `dangerouslySetInnerHTML` for dynamic script or style content.
+- **Mistakes are errors, not output.** A void element with children, a lambda in an attribute,
+  and an attribute name that would break out of its quotes all raise instead of rendering
+  something surprising.
+- **Escaping, fragments, spread, `dangerouslySetInnerHTML`, `className`/`style` handling, boolean
+  and `data`/`aria` attributes, children, render props, context, and `import`/`export default`**
+  all behave as they do in React.
 
 ---
 
