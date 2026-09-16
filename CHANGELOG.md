@@ -5,6 +5,13 @@ All notable changes to RSX are documented here. This project follows
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-09-16
+
+No change to the library. The RuboCop configuration set `AllCops/Exclude`, which replaces
+RuboCop's default excludes rather than adding to them, so the CI lint job — where Bundler
+installs gems into `vendor/bundle` inside the checkout — walked into the vendored gems and
+failed loading a plugin that RuboCop declares for linting its own source.
+
 ## [0.2.0] - 2026-09-16
 
 ### Fixed
