@@ -2,6 +2,11 @@ AllCops:
   TargetRubyVersion: 3.0
   NewCops: enable
   SuggestExtensions: false
+  # Listing Exclude replaces RuboCop's default list, which is what keeps
+  # vendor/bundle out of the run when Bundler installs gems inside the repo.
+  inherit_mode:
+    merge:
+      - Exclude
   Exclude:
     - "tmp/**/*"
     - "test/tmp/**/*"
