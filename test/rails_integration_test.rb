@@ -100,6 +100,40 @@ class RailsIntegrationTest < Minitest::Test
     assert_includes html, %(<p><a href="/docs">Docs</a></p>)
   end
 
+  # Rails' strict locals comment is an ordinary Ruby comment in .rsx, and Rails
+  # strips it from the source before the handler compiles anything.
+  def test_strict_locals_are_honoured
+    html = view.render(partial: "demo/strict", locals: { name: "Ada" })
+
+    assert_equal %(<p class="strict">Hello, Ada!</p>), html
+  end
+
+  def test_strict_locals_reject_an_undeclared_local
+    error = assert_raises(ActionView::Template::Error) do
+      view.render(partial: "demo/strict", locals: { name: "Ada", nope: 1 })
+    end
+    assert_includes error.message, "unknown local: :nope"
+  end
+
+  # Without a tracker, a `cache` block around an .rsx partial keeps serving stale
+  # markup after that partial changes, because Rails sees no dependencies.
+  def test_dependency_tracker_finds_rendered_partials
+    assert RSX::TemplateHandler.register_dependency_tracker
+
+    template = ActionView::Template.new(
+      File.read(File.join(VIEWS, "demo/show.html.rsx")),
+      File.join(VIEWS, "demo/show.html.rsx"),
+      RSX::TemplateHandler,
+      locals: [],
+      format: :html,
+      variant: nil,
+      virtual_path: "demo/show"
+    )
+
+    dependencies = ActionView::DependencyTracker.find_dependencies("demo/show", template)
+    assert_includes dependencies, "demo/row"
+  end
+
   def test_active_support_safe_buffers_are_not_double_escaped
     buffer = ActiveSupport::SafeBuffer.new("<b>safe</b>")
     assert_equal "<p><b>safe</b></p>", render("<p>{props[:value]}</p>", value: buffer)

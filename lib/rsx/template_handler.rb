@@ -30,6 +30,38 @@ module RSX
       def handles_encoding?
         true
       end
+
+      # Rails builds a cache key for a template from the templates it renders, and
+      # finds those by compiling the template and looking for `render` calls in
+      # the result. Without a tracker for .rsx, a `cache` block wrapping an .rsx
+      # partial keeps serving the old markup after that partial changes.
+      #
+      # Since .rsx compiles to Ruby, Rails' own Ruby tracker needs nothing from
+      # us beyond being pointed at the extension.
+      # Call this after registering the handler: Rails keys trackers by handler,
+      # so the extension has to resolve to this one already.
+      def register_dependency_tracker
+        return false unless defined?(::ActionView)
+
+        require "action_view/dependency_tracker"
+        tracker = ruby_dependency_tracker
+        return false if tracker.nil?
+
+        ::ActionView::DependencyTracker.register_tracker(:rsx, tracker)
+        true
+      rescue ::LoadError
+        false
+      end
+
+      private
+
+      def ruby_dependency_tracker
+        %i[RubyTracker RipperTracker].each do |name|
+          registry = ::ActionView::DependencyTracker
+          return registry.const_get(name) if registry.const_defined?(name)
+        end
+        nil
+      end
     end
   end
 end

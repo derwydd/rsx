@@ -1,0 +1,15 @@
+component <%= class_name %> do |<%= parameter_list %>|
+  return (
+    <div className="<%= file_name.dasherize %>">
+<% if props.any? -%>
+<% props.each do |prop| -%>
+      <p className="<%= file_name.dasherize %>__<%= prop.dasherize %>">{<%= prop %>}</p>
+<% end -%>
+<% else -%>
+      <p><%= class_name %></p>
+<% end -%>
+    </div>
+  )
+end
+
+export default <%= class_name %>

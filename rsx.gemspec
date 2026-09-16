@@ -29,6 +29,7 @@ Gem::Specification.new do |spec|
   spec.files = Dir[
     "lib/**/*.rb",
     "lib/**/*.rake",
+    "lib/generators/**/*.tt",
     "exe/*",
     "examples/**/*",
     "README.md",

@@ -30,6 +30,7 @@ module RSX
     initializer "rsx.action_view" do
       ActiveSupport.on_load(:action_view) do
         ActionView::Template.register_template_handler(:rsx, RSX::TemplateHandler)
+        RSX::TemplateHandler.register_dependency_tracker
         include RSX::Helpers
       end
     end
